@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: dark; /* use dark mode globally, DigiSign is dark-themed */
+}
+
+/* Input styling - updated to red highlight + dark background */
+.input {
+  @apply border border-gray-600 bg-black text-white rounded px-3 py-2 w-full mb-3 focus:outline-none focus:ring focus:ring-red-500 focus:border-red-500;
+}
+
+/* Custom Scrollbar - updated to black + red theme */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  background: #1f1f1f; /* blackish background */
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #dc2626; /* red thumb */
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #f87171; /* lighter red on hover */
+}
