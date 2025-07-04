@@ -106,11 +106,11 @@ export default function Home() {
       <div className="flex flex-col lg:flex-row items-center justify-center px-6 lg:px-16 gap-10">
         {/* LEFT IMAGE */}
         <div className="w-full lg:w-1/2 flex justify-center">
-          <img
-            src="public/pdfupload.png" // Replace this with your image path (e.g. in public/assets folder)
-            alt="Developer"
-            className="w-72 md:w-96 lg:w-[300px] drop-shadow-[0_0_8px_red]"
-          />
+         <img
+  src="/pdfupload.png"
+  alt="Developer"
+  className="w-72 md:w-96 lg:w-[300px] drop-shadow-[0_0_8px_red]"
+/>
         </div>
 
         {/* RIGHT TEXT + UPLOAD */}
