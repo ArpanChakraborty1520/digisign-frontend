@@ -9,13 +9,7 @@ import { toast, Toaster } from "react-hot-toast";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
-function SignatureDraggable({
-  signatureText,
-  selectedFont,
-  position,
-  setPosition,
-  isDragging,
-}) {
+const SignatureDraggable = ({ signatureText, selectedFont, position, setPosition, isDragging }) => {
   const {
     attributes,
     listeners,
@@ -40,9 +34,7 @@ function SignatureDraggable({
     userSelect: "none",
     touchAction: "none",
     textShadow: "1px 1px 2px #dc2626",
-    boxShadow: dndDragging
-      ? "0 0 0 2px #dc2626"
-      : "0 2px 6px rgba(220, 38, 38, 0.4)",
+    boxShadow: dndDragging ? "0 0 0 2px #dc2626" : "0 2px 6px rgba(220, 38, 38, 0.4)",
     transform: transform
       ? `translate(${transform.x}px, ${transform.y}px)`
       : undefined,
@@ -54,7 +46,7 @@ function SignatureDraggable({
       {signatureText || "Your signature"}
     </div>
   );
-}
+};
 
 export default function PDFPreview() {
   const { id } = useParams();
@@ -65,14 +57,15 @@ export default function PDFPreview() {
   const [signatureText, setSignatureText] = useState("");
   const [selectedFont, setSelectedFont] = useState("cursive");
   const [position, setPosition] = useState({ x: 100, y: 100 });
-  const [isDragging, setIsDragging] = useState(false);
   const [placedSignatures, setPlacedSignatures] = useState([]);
-  const [finalize, setfinalize] = useState(false);
+  const [finalize, setFinalize] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [renderedPageHeight, setRenderedPageHeight] = useState(0);
   const [showRejectReason, setShowRejectReason] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const navigate = useNavigate();
+
+  const BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -96,9 +89,7 @@ export default function PDFPreview() {
   };
 
   useEffect(() => {
-    if (doc) {
-      fetchPlacedSignatures();
-    }
+    if (doc) fetchPlacedSignatures();
   }, [doc]);
 
   const handleDrop = async ({ x, y }) => {
@@ -114,18 +105,16 @@ export default function PDFPreview() {
           yCoordinate: y,
           signature: signatureText,
           font: selectedFont,
-          renderedPageHeight: renderedPageHeight,
+          renderedPageHeight,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success("Signature placed!");
       await fetchPlacedSignatures();
       setSigning(false);
-      setfinalize(true);
+      setFinalize(true);
       setSignatureText("");
-    } catch (err) {
+    } catch {
       toast.error("Failed to place signature.");
     }
   };
@@ -133,51 +122,43 @@ export default function PDFPreview() {
   const handleFinalize = async () => {
     const token = localStorage.getItem("token");
     try {
-      toast.loading("Accepting signature...");
+      toast.loading("Finalizing signature...");
       const sigId = placedSignatures[0]?._id;
-      if (!sigId) return toast.error("No signature to accept.");
+      if (!sigId) return toast.error("No signature to finalize.");
 
       await API.post(`/signature/accept/${sigId}`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      toast.dismiss();
-      toast.success("Signature accepted!");
-
-      toast.loading("Generating signed PDF...");
-      const res = await API.post(
-        "/signature/finalize",
-        { fileId: doc._id },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await API.post("/signature/finalize", { fileId: doc._id }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       toast.dismiss();
-      toast.success("Signed PDF ready!");
-      window.open(`http://localhost:5000/${res.data.signedFile}`, "_blank");
+      toast.success("Signed PDF generated!");
+      window.open(`${BASE_URL}/${res.data.signedFile}`, "_blank");
       navigate("/home");
-    } catch (err) {
+    } catch {
       toast.dismiss();
-      toast.error("Failed to finalize signed PDF.");
+      toast.error("Finalization failed.");
     }
   };
 
   const handleReject = async () => {
     const reason = rejectReason.trim();
-    if (!reason) return toast.error("Please provide a reason.");
+    if (!reason) return toast.error("Enter a reason.");
+
     const sigId = placedSignatures[0]?._id;
-
     const token = localStorage.getItem("token");
-    try {
-      await API.post(
-        `/signature/reject/${sigId}`,
-        { reason },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
 
+    try {
+      await API.post(`/signature/reject/${sigId}`, { reason }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       toast.success("Document rejected.");
       navigate("/home");
-    } catch (err) {
-      toast.error("Failed to reject the document.");
+    } catch {
+      toast.error("Rejection failed.");
     }
   };
 
@@ -188,149 +169,98 @@ export default function PDFPreview() {
         headers: { Authorization: `Bearer ${token}` },
       });
       await fetchPlacedSignatures();
-      toast.success("Signature removed");
-      setfinalize(false);
-    } catch (err) {
-      toast.error("Failed to remove signature");
+      toast.success("Signature removed.");
+      setFinalize(false);
+    } catch {
+      toast.error("Failed to remove.");
     }
   };
 
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
-  };
+  if (loading) return <div className="text-center py-10 text-red-500">Loading...</div>;
+  if (!doc) return <div className="text-center py-10 text-red-500">Document not found.</div>;
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] bg-black text-white">
-        <motion.div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <span style={{ color: "#dc2626" }}>Loading PDF...</span>
-      </div>
-    );
-  }
-
-  if (!doc) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] bg-black text-white">
-        <span className="text-4xl mb-2">❌</span>
-        <span className="text-lg">Document not found.</span>
-      </div>
-    );
-  }
-
-  const fileUrl = `http://localhost:5000/${doc.filepath}`;
+  const fileUrl = `${BASE_URL}/${doc.filepath}`;
 
   return (
-    <div className="min-h-screen flex flex-col items-center py-10 px-4 bg-black text-white">
+    <div className="min-h-screen bg-black text-white px-4 py-6">
       <Toaster position="top-center" />
-      <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center break-words max-w-full" style={{ textShadow: "1px 1px 2px #dc2626" }}>
-        {doc.originalname}
-      </h2>
+      <h1 className="text-2xl font-bold text-center mb-6">{doc.originalname}</h1>
 
-      <div className="flex flex-col lg:flex-row w-full max-w-6xl gap-6">
+      <div className="flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto">
         {/* PDF Viewer */}
-        <motion.div
-          className="rounded-2xl p-4 w-full lg:w-3/4 flex flex-col items-center relative bg-[#111]"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-          style={{ boxShadow: "0 4px 20px rgba(220,38,38,0.6)" }}
-        >
-          <div className="w-full overflow-auto rounded-lg border border-[#dc2626] p-2 max-h-[75vh]">
-            <DndContext
-              onDragStart={(e) => {
-                if (e.active.id === "signature") setIsDragging(true);
-              }}
-              onDragEnd={(e) => {
-                if (e.active.id === "signature") {
-                  setIsDragging(false);
-                  const { delta } = e;
-                  const newX = position.x + delta.x;
-                  const newY = position.y + delta.y;
-                  setPosition({ x: newX, y: newY });
-                }
-              }}
-            >
-              <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess}>
-                {Array.from({ length: numPages }, (_, index) => (
-                  <div key={`page_${index + 1}`} className="relative">
-                    <Page
-                      pageNumber={index + 1}
-                      width={580}
-                      className="mx-auto my-4 shadow"
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                      onLoadSuccess={({ height }) =>
-                        index === 0 && setRenderedPageHeight(height)
-                      }
+        <div className="bg-[#111] rounded-xl p-4 w-full lg:w-3/4 border border-[#dc2626] shadow-md">
+          <DndContext
+            onDragStart={(e) => e.active.id === "signature" && setPosition((p) => ({ ...p }))}
+            onDragEnd={(e) => {
+              if (e.active.id === "signature") {
+                const { delta } = e;
+                setPosition((p) => ({
+                  x: p.x + delta.x,
+                  y: p.y + delta.y,
+                }));
+              }
+            }}
+          >
+            <Document file={fileUrl} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
+              {Array.from({ length: numPages }, (_, index) => (
+                <div key={index} className="relative mb-4">
+                  <Page
+                    pageNumber={index + 1}
+                    width={580}
+                    onLoadSuccess={({ height }) =>
+                      index === 0 && setRenderedPageHeight(height)
+                    }
+                  />
+                  {signing && index === 0 && (
+                    <SignatureDraggable
+                      signatureText={signatureText}
+                      selectedFont={selectedFont}
+                      position={position}
+                      setPosition={setPosition}
                     />
-                    {signing && index === 0 && (
-                      <SignatureDraggable
-                        signatureText={signatureText}
-                        selectedFont={selectedFont}
-                        position={position}
-                        setPosition={setPosition}
-                        isDragging={isDragging}
-                      />
-                    )}
-                    {placedSignatures
-                      .filter((sig) => sig.pageNumber === index + 1)
-                      .map((sig, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            position: "absolute",
-                            left: `${sig.xCoordinate}px`,
-                            top: `${sig.yCoordinate}px`,
-                            fontFamily: sig.font,
-                            fontSize: "20px",
-                            color: "#fff",
-                            background: "#000",
-                            border: "1px solid #dc2626",
-                            textShadow: "1px 1px 2px #dc2626",
-                            boxShadow: "0 2px 10px rgba(220, 38, 38, 0.6)",
-                            padding: "4px 8px",
-                            borderRadius: "6px",
-                          }}
+                  )}
+                  {placedSignatures
+                    .filter((sig) => sig.pageNumber === index + 1)
+                    .map((sig, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          position: "absolute",
+                          top: sig.yCoordinate,
+                          left: sig.xCoordinate,
+                          fontFamily: sig.font,
+                          fontSize: "18px",
+                          padding: "2px 6px",
+                          background: "#111",
+                          border: "1px solid #dc2626",
+                          borderRadius: "6px",
+                          color: "#fff",
+                        }}
+                      >
+                        <button
+                          onClick={() => handleRemoveSignature(sig._id)}
+                          className="absolute top-[-10px] right-[-10px] bg-[#dc2626] text-white rounded-full text-xs w-5 h-5"
                         >
-                          <button
-                            onClick={() => handleRemoveSignature(sig._id)}
-                            style={{
-                              position: "absolute",
-                              top: "-10px",
-                              right: "-10px",
-                              background: "#111",
-                              border: "1px solid #dc2626",
-                              color: "#fff",
-                              borderRadius: "50%",
-                              width: "22px",
-                              height: "22px",
-                              fontSize: "14px",
-                              zIndex: 2,
-                              cursor: "pointer",
-                            }}
-                          >
-                            ✖
-                          </button>
-                          {sig.signature}
-                        </div>
-                      ))}
-                  </div>
-                ))}
-              </Document>
-            </DndContext>
-          </div>
-        </motion.div>
+                          ×
+                        </button>
+                        {sig.signature}
+                      </div>
+                    ))}
+                </div>
+              ))}
+            </Document>
+          </DndContext>
+        </div>
 
-        {/* Right Controls */}
-        <div className="w-full lg:w-[220px] flex flex-col items-end gap-3">
+        {/* Control Panel */}
+        <div className="w-full lg:w-1/4 space-y-4">
           <button
             onClick={() => {
               setSigning(true);
               const user = JSON.parse(localStorage.getItem("user"));
-              setSignatureText(user.name);
+              setSignatureText(user?.name || "");
             }}
-            className="px-4 py-2 rounded text-white bg-[#dc2626] hover:bg-red-700 transition w-full"
-            style={{ boxShadow: "0 2px 8px rgba(220, 38, 38, 0.6)" }}
+            className="w-full py-2 bg-[#dc2626] text-white rounded hover:bg-red-700"
           >
             ✍️ Sign Document
           </button>
@@ -338,26 +268,23 @@ export default function PDFPreview() {
           {signing && (
             <>
               <input
-                type="text"
+                className="w-full px-3 py-2 rounded border border-[#dc2626] bg-[#111] text-white"
+                placeholder="Type your signature"
                 value={signatureText}
                 onChange={(e) => setSignatureText(e.target.value)}
-                placeholder="Type your signature"
-                className="w-full px-3 py-2 rounded border border-[#dc2626] bg-[#111] text-white mb-2"
               />
               <select
+                className="w-full px-3 py-2 rounded border border-[#dc2626] bg-[#111] text-white"
                 value={selectedFont}
                 onChange={(e) => setSelectedFont(e.target.value)}
-                className="w-full px-3 py-2 rounded border border-[#dc2626] bg-[#111] text-white"
               >
                 <option value="cursive">Cursive</option>
-                <option value="Great Vibes">Great Vibes</option>
                 <option value="Pacifico">Pacifico</option>
-                <option value="Dancing Script">Dancing Script</option>
-                <option value="Shadows Into Light">Shadows Into Light</option>
+                <option value="Great Vibes">Great Vibes</option>
               </select>
               <button
                 onClick={() => handleDrop(position)}
-                className="mt-2 px-4 py-2 rounded bg-[#dc2626] text-white w-full hover:bg-red-700"
+                className="w-full mt-2 py-2 bg-[#dc2626] text-white rounded hover:bg-red-700"
               >
                 Save
               </button>
@@ -365,52 +292,40 @@ export default function PDFPreview() {
           )}
 
           {placedSignatures.length > 0 && (
-            <div className="flex gap-3 mt-2">
+            <div className="flex gap-2">
               <button
                 onClick={handleFinalize}
-                className="w-20 px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white"
+                className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700"
               >
-                Accept
+                ✅ Accept
               </button>
               <button
                 onClick={() => setShowRejectReason(true)}
-                className="w-20 px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
+                className="w-full py-2 bg-red-600 text-white rounded hover:bg-red-700"
               >
-                Reject
+                ❌ Reject
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Reject Reason Modal */}
+      {/* Reject Modal */}
       {showRejectReason && (
-        <div className="fixed top-24 left-4 right-4 max-w-sm mx-auto bg-black text-white border-2 border-[#dc2626] rounded-xl shadow-lg z-50 p-6">
-          <h3 className="text-xl font-bold mb-2" style={{ textShadow: "0 0 6px #dc2626" }}>
-            Reject Document
-          </h3>
+        <div className="fixed top-24 left-4 right-4 max-w-md mx-auto bg-[#111] border border-[#dc2626] text-white p-6 rounded-xl shadow-lg z-50">
+          <h3 className="text-lg font-semibold mb-2">Reject Document</h3>
           <textarea
-            className="w-full mb-4 p-3 bg-[#111] text-white border border-[#dc2626] rounded resize-none"
-            placeholder="Enter reason..."
+            className="w-full p-3 rounded bg-black border border-[#dc2626]"
+            rows={4}
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            rows={4}
+            placeholder="Enter rejection reason"
           />
-          <div className="flex justify-end gap-3">
-            <button
-              className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
-              onClick={() => setShowRejectReason(false)}
-            >
+          <div className="flex justify-end mt-4 gap-3">
+            <button onClick={() => setShowRejectReason(false)} className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">
               Cancel
             </button>
-            <button
-              className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
-              onClick={async () => {
-                await handleReject(rejectReason);
-                setRejectReason("");
-                setShowRejectReason(false);
-              }}
-            >
+            <button onClick={handleReject} className="px-4 py-2 bg-red-600 rounded hover:bg-red-700">
               Reject
             </button>
           </div>
